@@ -22,8 +22,6 @@ import logging
 import asyncio
 import argparse
 
-import math
-
 global END
 END=False
 global Presence
@@ -63,7 +61,7 @@ async def main(device):
     global END
     try:
         if device is None:
-            logging.info("Scan for konashi devices for 5 seconds")
+            logging.info("scanForKonashiDevicesFor5Seconds")
             ks = await Konashi.search(5)
             if len(ks) > 0:
                 device = ks[0]
@@ -87,28 +85,42 @@ async def main(device):
         f=220.0
         d=0
 
-        def presence_cb(pres):#人感センサー1
+        def presence_cb(pres):#Human Sensor1
             global Presence
             Presence=pres
             print("Presence1:", pres)
         def input_cb(pin, level):
             global Presence2
-            if level:
-                Presence2=True
-            else:
-                Presence2=False
+            global Presence3
+            if pin==0:
+                if level:
+                    Presence2=True
+                else:
+                    Presence2=False
+            if pin==6:
+                if level:
+                    Presence2=True
+                else:
+                    Presence2=False
+            if pin==7:
+                if level:
+                    Presence3=True
+                else:
+                    Presence3=False
             logging.info("Pin {}: {},d= {}".format(pin, level,d))
 
-        #人感センサ設定
+        #Human sensor setting
         await device.builtin.presence.set_callback(presence_cb)
         # Input callback function set
         global Presence2
+        global Presence3
         Presence2=False
+        Presence3=False
         device.io.gpio.set_input_cb(input_cb)
         # GPIO0: enable, input, notify on change, pull-down off, pull-up off, wired function off
         # GPIO1~4: enable, output, pull-down off, pull-up off, wired function off
         await device.io.gpio.config_pins([
-            (0x01, KonashiGpio.PinConfig(KonashiGpio.PinDirection.INPUT, KonashiGpio.PinPull.NONE, True)),
+            (0xc1, KonashiGpio.PinConfig(KonashiGpio.PinDirection.INPUT, KonashiGpio.PinPull.NONE, True)),
         ])
         def hpwm_trans_end_cb(pin, duty):
             global Presence
@@ -116,7 +128,7 @@ async def main(device):
             if 0 < pin <= 3:
                 logging.info("HardPWM transition end on pin {}: current duty {}%".format(pin, duty))
                 new_pin = 2
-                if Presence or Presence2:
+                if Presence or Presence2 or Presence3:
                     new_duty = 50
                     alpha=255
                 else:
@@ -140,8 +152,8 @@ async def main(device):
             d=mel[t]
             f=Scale[d]
             await device.builtin.rgbled.set(RGB[d][0],RGB[d][1],RGB[d][2],alpha,100)
-            await device.io.hardpwm.config_pwm(1/f)#音を鳴らす
-            if Presence or Presence2:
+            await device.io.hardpwm.config_pwm(1/f)#Frequency setting
+            if Presence or Presence2 or Presence3:
                 t+=1
                 if t >= len(mel):
                     t=0
